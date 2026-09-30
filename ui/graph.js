@@ -5,13 +5,13 @@
   'use strict';
 
   /* #rrggbb -> rgba() without allocating a canvas gradient per edge per frame. */
-  var HEXCACHE = {};
+  var HEXCACHE = {}, HEXCOUNT = 0;
   function hexA(hex, a) {
     var key = hex + '|' + a.toFixed(3);
     if (HEXCACHE[key]) return HEXCACHE[key];
     var n = parseInt((hex || '#8fa3bf').slice(1), 16);
     var out = 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
-    if (Object.keys(HEXCACHE).length < 900) HEXCACHE[key] = out;
+    if (HEXCOUNT < 900) { HEXCACHE[key] = out; HEXCOUNT++; }
     return out;
   }
 
@@ -29,13 +29,16 @@
     this.showLabels = true;
     this.dim = false;
     this.tx = 0; this.ty = 0; this.scale = 1;
-    this.autoFit = true;
+    this.elapsed = 0;
+    this.lastFrame = null;
+    this.motionLevel = 0;
+    this.nextPulse = 2;
+    this.reducedMotion = !!(global.matchMedia && global.matchMedia("(prefers-reduced-motion: reduce)").matches);
     // Layout constants, kept together so the cloud can be retuned in one place.
     this.p = {
       repulsion: 3200,     // node-node push, falls off with distance squared
-      alphaFloor: 0.05,    // never freeze: the cloud keeps breathing
-      drift: 0.05,         // amplitude of the idle wander
-      activity: 0,         // raised while JARVIS is working
+      alphaFloor: 0.05,    // settling solver temperature floor
+      activity: 0,         // target for smoothly eased visual activity
       reach: 160,          // ignore pairs further apart than this
       spring: 0.035,       // link pull toward its rest length
       rest: 78,            // rest length before radii
@@ -51,7 +54,8 @@
     if (global.ResizeObserver) {
       var self = this;
       new ResizeObserver(function () {
-        if (self._needsFit || self.autoFit) self.fit();
+        // Only a real viewport resize may reframe the graph. Never follow nodes.
+        if (self.nodes.length) self.fit();
       }).observe(canvas);
     }
     requestAnimationFrame(this._loop);
@@ -70,7 +74,8 @@
       return Object.assign({}, n, {
         x: old ? old.x : W / 2 + Math.cos(ang) * rad,
         y: old ? old.y : H / 2 + Math.sin(ang) * rad,
-        vx: 0, vy: 0,
+        anchorX: old ? old.anchorX : null, anchorY: old ? old.anchorY : null,
+        vx: 0, vy: 0, opacity: old ? old.opacity : 1, hoverAmount: 0,
         phase: (i * 1.7) % (Math.PI * 2),   // unique drift offset per node
         wob: 0.55 + ((i * 37) % 100) / 140, // and a slightly different speed
         r: 4.5 + Math.min(25, Math.sqrt(n.degree || 0) * 3.3)
@@ -90,8 +95,23 @@
       self.adj.get(l.t.id).push(l.s.id);
     });
     this.alpha = 1;
-    this.warmup(this.nodes.length > 500 ? 22 : 400);
-    this.fit();
+    if (!prev.size) {
+      this.warmup(this.nodes.length > 500 ? 40 : 480);
+      this.nodes.forEach(function(n) { n.anchorX=n.x; n.anchorY=n.y; });
+      this.fit();
+    } else {
+      // Refreshes keep the existing layout and camera, including dragged nodes.
+      this.nodes.forEach(function(n) {
+        if (n.anchorX !== null) return;
+        var neighbours=(self.adj.get(n.id)||[]).map(function(id){return self.byId.get(id);}).filter(function(v){return prev.has(v.id);});
+        if(neighbours.length) {
+          n.x=neighbours.reduce(function(sum,v){return sum+v.anchorX;},0)/neighbours.length+Math.cos(n.phase)*70;
+          n.y=neighbours.reduce(function(sum,v){return sum+v.anchorY;},0)/neighbours.length+Math.sin(n.phase)*70;
+        }
+        n.anchorX=n.x;n.anchorY=n.y;
+      });
+    }
+    this._labelKey=null;
   };
 
   /* Run the simulation off-screen so the first frame the user sees is already
@@ -109,15 +129,16 @@
       nd.vx = nd.vy = 0;
     });
     this.alpha = 1;
-    this.warmup(steps || 400);
+    this.warmup(steps || 480);
+    this.nodes.forEach(function(n){n.anchorX=n.x;n.anchorY=n.y;});
     this.fit();
     return this.span();
   };
 
   MemoryGraph.prototype.span = function () {
     var vis = this.nodes.filter(this.visible, this);
-    var xs = vis.map(function (n) { return n.x; }).sort(function (a, b) { return a - b; });
-    var ys = vis.map(function (n) { return n.y; }).sort(function (a, b) { return a - b; });
+    var xs = vis.map(function (n) { return n.anchorX == null ? n.x : n.anchorX; }).sort(function (a, b) { return a - b; });
+    var ys = vis.map(function (n) { return n.anchorY == null ? n.y : n.anchorY; }).sort(function (a, b) { return a - b; });
     var c = Math.floor(xs.length * 0.03);
     return {
       w: Math.round(xs[xs.length - 1 - c] - xs[c]),
@@ -130,8 +151,7 @@
 
   MemoryGraph.prototype.setFilter = function (hiddenTypes) {
     this.hidden = new Set(hiddenTypes);
-    this.alpha = Math.max(this.alpha, 0.45);
-    this.fit();
+    this._labelKey=null; // Filtering changes visibility, never the camera.
   };
 
   MemoryGraph.prototype.setFocus = function (id, additive) {
@@ -217,11 +237,6 @@
       node.vx += (cx - node.x) * this.p.centre * this.alpha;
       node.vy += (cy - node.y) * this.p.centre * this.alpha;
       if (this.drag && this.drag.node === node) continue;
-      // Idle wander. Without this the layout converges and sits dead still,
-      // which reads as a screenshot rather than a live system.
-      var amp = this.p.drift * (1 + this.p.activity * 2.2);
-      node.vx += Math.cos(this.t * 0.009 * node.wob + node.phase) * amp;
-      node.vy += Math.sin(this.t * 0.011 * node.wob + node.phase * 1.6) * amp;
       node.vx *= this.p.damping; node.vy *= this.p.damping;
       node.x += node.vx; node.y += node.vy;
     }
@@ -229,11 +244,29 @@
   };
 
   /* ── render ─────────────────────────────── */
-  MemoryGraph.prototype._loop = function () {
+  // The force solver runs only before display. Idle motion is bounded around
+  // settled anchors, so it cannot drag the cloud or change the camera framing.
+  MemoryGraph.prototype._animate = function(dt) {
+    this.elapsed += dt;
+    this.motionLevel += (this.p.activity-this.motionLevel)*(1-Math.exp(-dt*2));
+    var amp=this.reducedMotion ? 0 : (4+this.motionLevel*2)*Math.min(1,this.elapsed/2);
+    for(var i=0;i<this.nodes.length;i++) {
+      var n=this.nodes[i];
+      n.hoverAmount += ((this.hover===n?1:0)-n.hoverAmount)*(1-Math.exp(-dt*12));
+      if(this.drag && this.drag.node===n) continue;
+      var rate=.20+n.wob*.09;
+      n.x=n.anchorX+Math.sin(this.elapsed*rate+n.phase)*amp;
+      n.y=n.anchorY+Math.cos(this.elapsed*rate*.83+n.phase)*amp;
+    }
+  };
+
+  MemoryGraph.prototype._loop = function (timestamp) {
     this._resize();
     if (this._needsFit && this.cv.clientWidth >= 50 && this.cv.clientHeight >= 50) this.fit();
-    this._tick();
-    if (this.autoFit && this.t % 45 === 0 && !this.drag) this.fit();
+    // Do not catch up after a suspended/background tab: resume gently.
+    var dt=this.lastFrame===null ? 0 : Math.min(.05,Math.max(0,(timestamp-this.lastFrame)/1000));
+    this.lastFrame=timestamp;
+    this._animate(dt);
     var ctx = this.ctx, W = this.cv.clientWidth, H = this.cv.clientHeight;
     ctx.clearRect(0, 0, W, H);
     ctx.save();
@@ -267,7 +300,7 @@
       ctx.stroke();
     }
 
-    this._pulses(ctx, lit);
+    this._pulses(ctx, lit, dt);
 
     for (var j = 0; j < this.nodes.length; j++) {
       var nd = this.nodes[j];
@@ -275,18 +308,19 @@
       var isLit = !lit || lit.has(nd.id);
       var isTrace = traceSet && traceSet.has(nd.id);
       var alpha = isTrace ? 1 : (isLit ? 1 : 0.085);
-      ctx.globalAlpha = alpha;
+      nd.opacity += (alpha-nd.opacity)*(1-Math.exp(-dt*10));
+      ctx.globalAlpha = nd.opacity;
       if ((isTrace || (this.focus === nd.id)) || (nd.r > 9 && !lit)) {
         ctx.shadowColor = nd.colour; ctx.shadowBlur = isTrace ? 22 : 14;
       } else { ctx.shadowBlur = 0; }
       ctx.beginPath();
-      ctx.arc(nd.x, nd.y, nd.r * (this.hover === nd ? 1.16 : 1), 0, Math.PI * 2);
+      ctx.arc(nd.x, nd.y, nd.r * (1+nd.hoverAmount*.16), 0, Math.PI * 2);
       ctx.fillStyle = nd.colour;
       ctx.fill();
       if (this.focus === nd.id || isTrace) {
         ctx.shadowBlur = 0;
         ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
-        var breathe = 1 + Math.sin(this.t * 0.06) * 0.18;
+        var breathe = 1 + Math.sin(this.elapsed * 1.5) * 0.1;
         ctx.beginPath();
         ctx.arc(nd.x, nd.y, nd.r * 1.9 * breathe, 0, Math.PI * 2);
         ctx.strokeStyle = hexA(nd.colour, 0.34);
@@ -304,11 +338,18 @@
       }).sort(function (a,b) { return (b === self.hover ? 10000 : b.degree) - (a === self.hover ? 10000 : a.degree); });
       ctx.font = '500 ' + (11 / Math.max(.8, this.scale)) + 'px ui-monospace, Menlo, monospace';
       ctx.textAlign = 'center';
+      var labelKey=candidates.map(function(n){return n.id;}).join(',')+'|'+this.scale;
+      var rebuild=this._labelKey!==labelKey;this._labelKey=labelKey;
       candidates.forEach(function (n) {
         var w = ctx.measureText(n.title).width, h = 15 / self.scale;
         var box = {x:n.x-w/2-4,y:n.y-n.r-h-7,w:w+8,h:h+5};
-        if (occupied.some(function (b) {return box.x < b.x+b.w && box.x+box.w>b.x && box.y<b.y+b.h && box.y+box.h>b.y;})) return;
-        occupied.push(box); ctx.globalAlpha = .92;
+        if(rebuild){
+          box.x-=7;box.y-=7;box.w+=14;box.h+=14;
+          n.drawLabel=!occupied.some(function(b){return box.x<b.x+b.w&&box.x+box.w>b.x&&box.y<b.y+b.h&&box.y+box.h>b.y;});
+          if(n.drawLabel)occupied.push(box);
+        }
+        if(!n.drawLabel)return;
+        ctx.globalAlpha = .92;
         ctx.lineWidth = 3.5 / self.scale; ctx.strokeStyle = '#030609';
         ctx.strokeText(n.title,n.x,n.y-n.r-7);
         ctx.fillStyle = '#d5dee7';ctx.fillText(n.title,n.x,n.y-n.r-7);
@@ -322,17 +363,19 @@
   /* Traffic on the graph: small bright packets run along random edges. Rate
      scales with activity, so the whole cloud visibly wakes up while Codex is
      working and settles back to a slow trickle when idle. */
-  MemoryGraph.prototype._pulses = function (ctx, lit) {
-    var want = 1 + Math.round(this.p.activity * 7);
-    if (this.links.length && this.pulses.length < want && Math.random() < (this.p.activity ? 0.14 : 0.008)) {
+  MemoryGraph.prototype._pulses = function (ctx, lit, dt) {
+    var want = 1 + Math.round(this.motionLevel * 4);
+    this.nextPulse -= dt;
+    if (this.links.length && this.pulses.length < want && this.nextPulse<=0 && !this.reducedMotion) {
       var link = this.links[(Math.random() * this.links.length) | 0];
       if (this.visible(link.s) && this.visible(link.t)) {
-        this.pulses.push({ l: link, t: 0, v: 0.006 + Math.random() * 0.012 });
+        this.pulses.push({ l: link, t: 0, v: .18 + Math.random() * .12 });
+        this.nextPulse=(2+Math.random()*2)/(1+this.motionLevel*4);
       }
     }
     for (var i = this.pulses.length - 1; i >= 0; i--) {
       var pz = this.pulses[i];
-      pz.t += pz.v * (1 + this.p.activity);
+      pz.t += pz.v * dt * (1 + this.motionLevel);
       if (pz.t >= 1 || !this.visible(pz.l.s) || !this.visible(pz.l.t)) {
         this.pulses.splice(i, 1);
         continue;
@@ -354,7 +397,7 @@
   /* 0 = idle, 1 = working. Drives drift amplitude and pulse traffic. */
   MemoryGraph.prototype.setActivity = function (level) {
     this.p.activity = Math.max(0, Math.min(1, level));
-    if (level > 0) this.alpha = Math.max(this.alpha, 0.22);
+    // Activity only eases pulse speed and bounded motion, never reheats layout.
   };
 
   MemoryGraph.prototype._resize = function () {
@@ -377,8 +420,8 @@
     this._needsFit = false;
     // Trim the extremes before measuring: two stray nodes on the rim must not
     // shrink the whole cloud to a dot in the middle of the canvas.
-    var xs = vis.map(function (n) { return n.x; }).sort(function (a, b) { return a - b; });
-    var ys = vis.map(function (n) { return n.y; }).sort(function (a, b) { return a - b; });
+    var xs = vis.map(function (n) { return n.anchorX == null ? n.x : n.anchorX; }).sort(function (a, b) { return a - b; });
+    var ys = vis.map(function (n) { return n.anchorY == null ? n.y : n.anchorY; }).sort(function (a, b) { return a - b; });
     var cut = Math.floor(xs.length * 0.03);
     var minX = xs[cut], maxX = xs[xs.length - 1 - cut];
     var minY = ys[cut], maxY = ys[ys.length - 1 - cut];
@@ -407,7 +450,7 @@
     var self=this, cv=this.cv, start=null, moved=false;
     cv.addEventListener('pointerdown',function(e){
       if (e.button!==0) return;
-      self.autoFit=false;
+
       cv.setPointerCapture(e.pointerId); start={x:e.clientX,y:e.clientY};moved=false;
       var hit=self._at(e);
       if(hit) self.drag={node:hit};
@@ -419,7 +462,11 @@
         var r=cv.getBoundingClientRect();
         self.drag.node.x=(e.clientX-r.left-self.tx)/self.scale;
         self.drag.node.y=(e.clientY-r.top-self.ty)/self.scale;
-        self.drag.node.vx=self.drag.node.vy=0;
+        var nd=self.drag.node,amp=self.reducedMotion?0:(4+self.motionLevel*2)*Math.min(1,self.elapsed/2),rate=.20+nd.wob*.09;
+        // Offset the anchor by the current drift so release has no snap.
+        nd.anchorX=nd.x-Math.sin(self.elapsed*rate+nd.phase)*amp;
+        nd.anchorY=nd.y-Math.cos(self.elapsed*rate*.83+nd.phase)*amp;
+        nd.vx=nd.vy=0;
       } else if(self.panning && moved){self.tx=e.clientX-self.panning.x;self.ty=e.clientY-self.panning.y;}
       else if(!start){self.hover=self._at(e);cv.style.cursor=self.hover?'pointer':'grab';}
     });
@@ -430,7 +477,7 @@
     cv.addEventListener('pointercancel',function(){self.drag=null;self.panning=null;start=null;});
     cv.addEventListener('pointerleave',function(){self.hover=null;});
     cv.addEventListener('wheel',function(e){
-      self.autoFit=false;
+
       e.preventDefault();var r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
       var next=Math.max(.15,Math.min(5,self.scale*Math.exp(-e.deltaY*.0015)));
       self.tx=mx-(mx-self.tx)*(next/self.scale);self.ty=my-(my-self.ty)*(next/self.scale);self.scale=next;

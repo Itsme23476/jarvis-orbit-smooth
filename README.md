@@ -1,8 +1,16 @@
-# JARVIS · Orbit
+# JARVIS · Orbit Smooth
 
 A separate voice assistant with a living canvas memory graph, a rotating reactor,
 source cards, and a Codex conversation backend. Inspired by the supplied Jarvis
 reference screenshots. Addresses you as **sir** by default.
+
+This edition keeps the view still while the graph breathes. Nodes drift gently
+around settled positions, with animation timing independent of screen refresh
+rate. There is no automatic zoom or recentering during idle motion, filtering,
+replies, or data refreshes. Fit, manual pan/zoom, and an actual window resize can
+still change the view. Dragged nodes stay where you place them. Labels and the
+inspector panel keep stable positions, and reactor rotation stays continuous
+when assistant activity changes.
 
 ## Start
 
@@ -133,7 +141,7 @@ python3 data/generate.py
 python3 -m unittest discover -s tests -v
 node --check ui/app.js
 node --check ui/graph.js
-node --test tests/voice.test.cjs
+node --test tests/graph.test.cjs tests/voice.test.cjs
 ```
 
 `JARVIS_OPEN=0` suppresses automatic browser opening. `JARVIS_MODEL` overrides

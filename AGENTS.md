@@ -19,4 +19,4 @@ Never commit `.env`, `.jarvis.local.json`, saved memories, conversation data, or
 personal source files. Test with temporary directories and fictional fixtures.
 
 Verification: `python3 -m unittest discover -s tests -v`, `node --check ui/app.js`,
-`node --check ui/graph.js`, and `node --test tests/voice.test.cjs`. Run from this directory.
+`node --check ui/graph.js`, and `node --test tests/graph.test.cjs tests/voice.test.cjs`. Run from this directory.

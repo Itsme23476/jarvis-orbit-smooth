@@ -139,7 +139,7 @@ function openMemory(fact=""){if(busy){notice("Finish or stop the current answer 
 window.addEventListener("DOMContentLoaded",async()=>{
  buildReactor();graph=new MemoryGraph($("#graph"),{onSelect:renderInspector});window.jarvisGraph=graph;
  $("#askForm").onsubmit=e=>{e.preventDefault();const text=$("#ask").value;$("#ask").value="";transmit(text);};
- $("#fitButton").onclick=()=>{graph.highlight([]);graph.setFocus(null);graph.autoFit=true;graph.fit();};
+ $("#fitButton").onclick=()=>{graph.highlight([]);graph.setFocus(null);graph.fit();};
  $("#labelsButton").onclick=()=>{$("#labelsButton").classList.toggle("active",graph.showLabels=!graph.showLabels);};
  $("#dimButton").onclick=()=>{$("#dimButton").classList.toggle("active",graph.dim=!graph.dim);};
  $("#resetFilters").onclick=()=>{hiddenTypes.clear();graph.setFilter(hiddenTypes);renderLists();};
