@@ -1,0 +1,59 @@
+{
+  "as_of": "2026-10-01",
+  "currency": "EUR",
+  "clients": [
+    {
+      "name": "Fairview Dental",
+      "signed": "2026-09-30",
+      "paid": 2400,
+      "qualification": "Payment received; demo record, not total contract value."
+    },
+    {
+      "name": "Copper & Rye",
+      "signed": "2026-09-28",
+      "paid": 2100,
+      "qualification": "Payment received; demo record, not total contract value."
+    },
+    {
+      "name": "Halden Physio",
+      "signed": "2026-09-26",
+      "paid": 1500,
+      "qualification": "Payment received; demo record, not total contract value."
+    }
+  ],
+  "inbox": [
+    {
+      "from": "Priya Raman",
+      "subject": "Fairview handover notes",
+      "summary": "Please review the draft runbook before our call.",
+      "client": "Fairview Dental",
+      "unread": true
+    },
+    {
+      "from": "Ines Duarte",
+      "subject": "Kestrel audit scope",
+      "summary": "Can the quote separate discovery from implementation?",
+      "client": "Kestrel Logistics",
+      "unread": true
+    }
+  ],
+  "calendar": [
+    {
+      "time": "10:00",
+      "title": "Fairview handover review",
+      "client": "Fairview Dental"
+    },
+    {
+      "time": "14:00",
+      "title": "Kestrel discovery call",
+      "client": "Kestrel Logistics"
+    }
+  ],
+  "tasks": [
+    "Review the Kestrel audit scope before the discovery call.",
+    "Check the Fairview handover runbook.",
+    "Clarify Sams capacity before committing to new work.",
+    "Review outstanding invoice terms.",
+    "Protect a ninety-minute delivery block."
+  ]
+}

@@ -1,0 +1,11 @@
+---
+type: note
+updated: 2026-10-01
+sample: true
+---
+
+# Note 14 — Delivery insight
+
+A fictional observation: reusable components reduce delivery effort when the acceptance criteria stay clear.
+
+[[Reusable components]] · [[SOP — Automation build]] · [[Change orders]]

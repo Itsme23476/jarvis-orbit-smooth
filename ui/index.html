@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="jarvis-token" content="__JARVIS_TOKEN__">
+<title>JARVIS — Orbit</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-state="idle">
+<div class="ambient"></div>
+<header class="brand"><span class="pilot"></span><h1>JARVIS</h1><span id="modeBadge" class="badge">DEMO</span></header>
+<div class="top-meta"><span id="memoryCount">INITIALIZING MEMORY</span><button id="settingsButton" class="plain" title="Settings" aria-label="Open settings">⚙</button></div>
+<div class="graph-toolbar"><button id="fitButton" title="Fit graph">⊙ <span>Fit</span></button><button id="labelsButton" class="active" title="Toggle labels">Aa</button><button id="dimButton" title="Dim connections">◐</button></div>
+<main>
+  <div class="graph-space"><canvas id="graph" aria-label="Interactive memory graph"></canvas><div id="graphEmpty" hidden>No notes yet.<br><button class="link" id="emptySettings">Add a folder in Settings</button></div></div>
+  <aside class="left-rail">
+    <section><h2>Inspector <span id="inspectorType"></span></h2><div class="glass inspector" id="inspector"><p class="muted">Click a node to focus it — only that node and its connections light up, and you can read its note here. Shift-click a second node to trace the path.</p></div></section>
+    <section class="hub-section"><h2>Top hubs <span>CONNECTIONS</span></h2><div class="glass"><ul id="hubs" class="node-list"></ul></div><p class="interaction-hint">drag · scroll to zoom · shift-click to trace</p></section>
+    <div class="left-footer"><span class="tiny-line"></span><p>YOUR WORLD.<br><strong>CONNECTED.</strong></p><small id="guardrailLabel">READ-ONLY · LOCAL MEMORY</small></div>
+  </aside>
+  <aside class="right-rail">
+    <section class="filter-section"><h2>Filter <button class="link" id="resetFilters">reset</button></h2><div class="glass"><ul id="filters" class="node-list"></ul></div></section>
+    <section class="reactor-section" aria-label="Assistant activity">
+      <div class="reactor" id="reactor">
+        <svg viewBox="0 0 240 240" aria-hidden="true"><defs><filter id="glow"><feGaussianBlur stdDeviation="2"/></filter></defs><g id="outerTicks"></g><circle class="orbit orbit-outer" cx="120" cy="120" r="97"/><circle class="orbit orbit-dots" cx="120" cy="120" r="81"/><g class="spin-one"><circle class="arc amber halo" cx="120" cy="120" r="91"/><circle class="arc amber" cx="120" cy="120" r="91"/></g><g class="spin-two"><circle class="arc lavender" cx="120" cy="120" r="73"/></g><circle class="core-ring" cx="120" cy="120" r="49"/><g id="innerTicks"></g><circle class="core" cx="120" cy="120" r="35"/></svg>
+        <div class="reactor-word">J.A.R.V.I.S.</div><div class="audio-bars" id="audioBars" aria-hidden="true"></div>
+      </div>
+      <div class="state-label"><i></i><span id="stateText">STANDBY</span></div><p id="stateHint">At your service, sir.</p>
+      <button id="modelBadge" class="model-badge" title="Codex connection status">CODEX · READY</button>
+    </section>
+  </aside>
+  <section class="reply-zone" id="replyZone" aria-live="polite"><div id="spokenReply" class="spoken-reply" hidden></div><div id="detailCards"></div></section>
+  <div class="user-caption" id="userCaption" hidden></div>
+  <div class="bottom-zone">
+    <form id="askForm" class="ask-form"><label for="ask">Ask</label><input id="ask" autocomplete="off" placeholder="“How is the studio doing?”" aria-label="Ask Jarvis"><button class="send-button" aria-label="Send message" title="Send">↗</button></form>
+    <nav class="actions" aria-label="Assistant controls"><button id="micButton" class="round mic" title="Start hands-free listening" aria-label="Start listening"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3M9 21h6"/></svg></button><button id="muteButton" class="round" title="Mute speech" aria-label="Mute speech"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4ZM15 8c3 2 3 6 0 8M18 5c5 4 5 10 0 14"/></svg></button><button id="briefButton" class="round warm" title="Brief me" aria-label="Brief me"><svg viewBox="0 0 24 24"><path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5ZM10 20h4"/></svg></button><button id="planButton" class="round pale" title="Plan my day" aria-label="Plan my day"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M8 12a6 6 0 1 1 8 0c-1 1-2 2-2 4h-4c0-2-1-3-2-4"/></svg></button><button id="memoryButton" class="round" title="Remember something" aria-label="Remember something"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg></button></nav>
+  </div>
+  <div class="bottom-handle"></div>
+</main>
+<div id="notice" class="notice" role="status" hidden></div>
+<footer class="signature">ORBIT / 01 <span>POWERED BY CODEX</span></footer>
+<dialog id="settingsDialog"><form id="settingsForm"><div class="dialog-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h3>Your Jarvis</h3></div><button type="button" class="plain" id="closeSettings" aria-label="Close settings">✕</button></div>
+<div class="settings-tabs"><button type="button" data-tab="profile" class="active">About you</button><button type="button" data-tab="voice">Voice</button><button type="button" data-tab="sources">Memory sources</button></div>
+<section data-pane="profile"><label>How should I address you?<input id="profileName" value="sir" maxlength="80"></label><label>What do you do?<textarea id="profileBusiness" placeholder="Your work, what you sell, and who you help…"></textarea></label><label>Personal context & tools<textarea id="profileContext" placeholder="Your priorities, preferences, and the tools you use…"></textarea></label><p class="muted">This stays in your local profile. You decide what Jarvis knows.</p></section>
+<section data-pane="voice" hidden><p class="muted">Connect ElevenLabs for natural speech and Scribe transcription. Voice requests use your ElevenLabs credits.</p><label>ElevenLabs API key<input id="voiceKey" type="password" autocomplete="off" placeholder="Enter your key privately"></label><button type="button" id="loadVoices" class="secondary">Connect & load voices</button><label>Voice<select id="voiceSelect"><option value="">Connect ElevenLabs first</option></select></label><label class="check"><input id="voiceConsent" type="checkbox">Enable paid voice requests with my ElevenLabs account</label><button type="button" id="testVoice" class="secondary">Test saved voice</button><p class="muted">The saved key is never returned to the page. Initial entry travels once to your local server. You can also use a hidden terminal prompt.</p></section>
+<section data-pane="sources" hidden><div class="mode-note" id="sourceMode">Demo mode uses fictional files. Personal folders are untouched.</div><label>Read-only folders — one full path per line<textarea id="sourceFolders" placeholder="/Users/you/Documents/Notes"></textarea></label><label>Inbox export (.json, optional)<input id="sourceInbox" placeholder="/full/path/to/inbox.json"></label><label>Calendar export (.json, optional)<input id="sourceCalendar" placeholder="/full/path/to/calendar.json"></label><p class="muted">To opt into your own files, set JARVIS_DEMO=0 and restart. Markdown and text work immediately. PDFs use pdftotext if already installed. Email and calendar imports are read-only snapshots.</p></section>
+<p id="settingsStatus" role="status"></p><button class="primary" type="submit">Save preferences <span>↗</span></button></form></dialog>
+<dialog id="memoryDialog"><form id="memoryForm"><div class="dialog-heading"><div><p class="eyebrow">LONG-TERM MEMORY</p><h3>Something worth keeping.</h3></div><button type="button" id="closeMemory" class="plain" aria-label="Close memory">✕</button></div><label>One fact to remember<textarea id="memoryFact" maxlength="4000" required placeholder="Remember that I prefer short, direct answers."></textarea></label><p class="muted">Saves a dated note inside this projects memory folder. Your source files remain untouched.</p><button class="primary">Save this memory <span>↗</span></button></form></dialog>
+<script src="graph.js"></script><script src="app.js"></script>
+</body></html>
