@@ -14,6 +14,10 @@ when assistant activity changes.
 
 ## Start
 
+Using a fresh Codex session? Copy the [installation prompt](INSTALL_PROMPT.md).
+Private repositories require an authorized GitHub login; anonymous cloning only
+works after the owner makes the repository public.
+
 Requires Python **3.9+**, an installed Codex CLI signed in with `codex login`,
 and a current browser with microphone access on localhost. No Python packages,
 JavaScript packages, database, or build step.
